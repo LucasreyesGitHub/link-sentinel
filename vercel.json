@@ -1,0 +1,8 @@
+{
+  "rewriteConfig": {
+    "dynamicRoutes": true
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index" }
+  ]
+}
