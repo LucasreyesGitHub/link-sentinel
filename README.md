@@ -1,19 +1,43 @@
-# Link Sentinel 🛡️
+# 🛡️ Link Sentinel
 
-Analizador de seguridad de URLs escrito en Python. Este proyecto combina análisis de reglas lógicas (heurística) con consultas de reputación global mediante la API de VirusTotal.
+Analizador de seguridad de URLs desarrollado en Python. Este proyecto combina análisis heurístico (basado en reglas lógicas) con consultas de reputación global utilizando la API de VirusTotal.
+
+## 🌐 Demo Online
+
+🚀 **Accede directamente a la herramienta sin instalar nada:**  
+👉 [Link Sentinel Web App](TU_LINK_DE_VERCEL_AQUI)
+
+---
 
 ## 🚀 Características
-- **Detección de Protocolo:** Identifica sitios sin cifrado SSL.
-- **Análisis Estructural:** Busca caracteres usados comúnmente en ataques de phishing.
-- **Integración con VirusTotal:** Consulta resultados de más de 70 motores de antivirus en tiempo real.
 
-## 🛠️ Instalación y Uso
-1. Clona el repositorio.
-2. Crea un archivo `.env` y añade tu `VT_API_KEY`.
-3. Instala dependencias: `pip install -r requirements.txt`.
-4. Ejecuta: `python main.py`.
+- 🔒 **Detección de Protocolo:** Identifica sitios sin cifrado SSL (HTTP).
+- 🧩 **Análisis Estructural:** Detecta patrones comunes en ataques de phishing.
+- 🌍 **Integración con VirusTotal:** Consulta más de 70 motores antivirus en tiempo real.
+
+---
 
 ## 🧠 ¿Cómo funciona?
-El script toma la URL ingresada y realiza dos validaciones:
-1. **Lógica local:** Evalúa si la URL tiene comportamientos sospechosos (ej. falta de HTTPS).
-2. **Consulta remota:** Envía un hash de la URL a VirusTotal para verificar si ha sido reportada previamente como maliciosa.
+
+El sistema analiza la URL en dos niveles:
+
+- **Lógica local:** Evalúa comportamientos sospechosos (por ejemplo, ausencia de HTTPS o estructura irregular).
+- **Consulta remota:** Envía un hash de la URL a VirusTotal para verificar si ha sido reportada como maliciosa.
+
+---
+
+## 🛠️ Uso local (opcional)
+
+Si deseas ejecutarlo en tu entorno local:
+
+1. Clona el repositorio:
+   ```bash
+   git clone <TU_REPO_URL>
+   cd link-sentinel
+2. Crea un archivo .env y añade tu API Key:
+   VT_API_KEY=tu_api_key_aqui
+3. Instala las dependencias:
+   pip install -r requirements.txt
+4. Ejecuta el script:
+   python main.py     
+    
