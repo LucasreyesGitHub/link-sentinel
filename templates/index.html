@@ -24,6 +24,7 @@
         <h1 style="color: var(--matrix-green); margin-bottom: 5px;">🛡️ LINK SENTINEL</h1>
         <p style="font-size: 0.75rem; margin-bottom: 20px; opacity: 0.8;">Análisis de Redirecciones & GitHub OSINT</p>
         <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input type="text" name="url" placeholder="Pegar URL sospechosa..." required value="{{ url if url }}">
             <button type="submit">EJECUTAR ESCANEO</button>
         </form>
