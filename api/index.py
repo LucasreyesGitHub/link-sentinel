@@ -3,8 +3,9 @@ import re
 import secrets
 import socket
 import ipaddress
+import contextlib
 import requests
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 from flask import Flask, render_template, request, session, abort
 
 app = Flask(__name__, template_folder='../templates')
@@ -27,22 +28,76 @@ _REDES_PRIVADAS = [
     ipaddress.ip_network("fc00::/7"),
 ]
 
-def _ip_privada(host):
+def _es_ip_privada(ip_str):
     try:
-        ip = ipaddress.ip_address(socket.gethostbyname(host))
+        ip = ipaddress.ip_address(ip_str)
         return any(ip in red for red in _REDES_PRIVADAS)
     except Exception:
-        return True  # No se puede resolver → bloquear por seguridad
+        return True  # IP no parseable → bloquear por seguridad
 
 def validar_url(url):
+    """Valida esquema/host y resuelve el DNS UNA sola vez, devolviendo la IP
+    ya validada. Esa misma IP se usa luego para la conexión real (ver
+    _dns_pinned) para que un segundo lookup DNS (rebinding) no pueda apuntar
+    a una red interna después de haber pasado este chequeo."""
     try:
         parsed = urlparse(url)
     except Exception:
-        return False
+        return False, None
     if parsed.scheme not in ('http', 'https'):
-        return False
+        return False, None
     host = parsed.hostname
-    return bool(host) and not _ip_privada(host)
+    if not host:
+        return False, None
+    try:
+        ip = socket.gethostbyname(host)
+    except Exception:
+        return False, None
+    if _es_ip_privada(ip):
+        return False, None
+    return True, ip
+
+@contextlib.contextmanager
+def _dns_pinned(host, ip):
+    """Fuerza que, durante la petición, `host` resuelva a la IP ya validada
+    en vez de dejar que la librería de red vuelva a consultar el DNS."""
+    original_getaddrinfo = socket.getaddrinfo
+
+    def pinned_getaddrinfo(hostname, *args, **kwargs):
+        if hostname == host:
+            hostname = ip
+        return original_getaddrinfo(hostname, *args, **kwargs)
+
+    socket.getaddrinfo = pinned_getaddrinfo
+    try:
+        yield
+    finally:
+        socket.getaddrinfo = original_getaddrinfo
+
+def fetch_validado(url_inicial, max_saltos=5):
+    """Sigue redirecciones manualmente, validando (SSRF + DNS pinning) cada
+    salto por separado. requests.head(..., allow_redirects=True) NO sirve
+    para esto porque seguiría automáticamente cualquier redirección
+    intermedia sin validarla, aunque la URL final fuera segura."""
+    url = url_inicial
+    for _ in range(max_saltos):
+        ok, ip = validar_url(url)
+        if not ok:
+            return None
+        host = urlparse(url).hostname
+        with _dns_pinned(host, ip):
+            resp = requests.head(
+                url,
+                allow_redirects=False,
+                timeout=5,
+                headers={"User-Agent": "LinkSentinel/1.0"},
+            )
+        location = resp.headers.get('Location')
+        if resp.is_redirect and location:
+            url = urljoin(url, location)
+            continue
+        return url
+    return None
 
 def analizar_github_repo(url):
     match = re.search(r"github\.com/([\w\-]+)/([\w\-]+)", url)
@@ -118,26 +173,16 @@ def index():
             if not url_in.startswith(('http://', 'https://')):
                 url_in = 'https://' + url_in
 
-            if not validar_url(url_in):
-                error = "URL no válida o no permitida"
-            else:
-                try:
-                    r_url = requests.head(
-                        url_in,
-                        allow_redirects=True,
-                        timeout=5,
-                        headers={"User-Agent": "LinkSentinel/1.0"},
-                    )
-                    url_final = r_url.url
-                    if not validar_url(url_final):
-                        error = "La URL redirige a una dirección no permitida"
-                        url_final = None
-                    else:
-                        resultado, error = consultar_vt(url_final)
-                        if url_final and "github.com" in url_final.lower():
-                            peligros = analizar_github_repo(url_final)
-                except requests.RequestException:
-                    error = "No se pudo alcanzar la URL"
+            try:
+                url_final = fetch_validado(url_in)
+                if not url_final:
+                    error = "URL no válida, no permitida, o redirige a una dirección no permitida"
+                else:
+                    resultado, error = consultar_vt(url_final)
+                    if url_final and "github.com" in url_final.lower():
+                        peligros = analizar_github_repo(url_final)
+            except requests.RequestException:
+                error = "No se pudo alcanzar la URL"
 
     csrf_token = session.get('csrf_token', '')
     return render_template(
